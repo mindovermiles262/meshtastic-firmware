@@ -35,6 +35,7 @@
 #include <utility>
 // #include <driver/rtc_io.h>
 
+//Used for sensing and transmitting from an adc
 #include <string>
 const int sensor_pin = 2; //replace with your sensor pin
 int moist;
