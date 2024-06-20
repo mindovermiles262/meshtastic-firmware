@@ -35,6 +35,15 @@
 #include <utility>
 // #include <driver/rtc_io.h>
 
+#include <string>
+const int sensor_pin = 2; //replace with your sensor pin
+int moist;
+string moist_string;
+unsigned long long previousMillis_sampling = 0ULL;
+unsigned long interval_sampling = 1000UL * 100; //Sampled Once Every 100 Seconds
+unsigned long long previousMillis_transmission = 0ULL;
+unsigned long interval_transmission = 1000UL * 120;  //Transmitted Once Every 120 seconds
+
 #ifdef ARCH_ESP32
 #if !MESHTASTIC_EXCLUDE_WEBSERVER
 #include "mesh/http/WebServer.h"
@@ -1053,4 +1062,28 @@ void loop()
         mainDelay.delay(delayMsec);
     }
     // if (didWake) LOG_DEBUG("wake!\n");
+
+    unsigned long long currentMillis_sampling = millis();
+    if(currentMillis_sampling - previousMillis_sampling > interval_sampling)
+        {
+            moist = analogRead(sensor_pin);
+            previousMillis_sampling = currentMillis_sampling;
+        }
+
+    unsigned long long currentMillis_transmission = millis();
+    if(currentMillis_transmission - previousMillis_transmission > interval_transmission)
+        {
+            moist_string = to_string(moist);
+            const void *bcd = moist_string.c_str();
+            LOG_DEBUG("Moisture reading is %d\n", moist);
+            LOG_DEBUG("Moisture String is %s\n", bcd);
+
+            meshtastic_MeshPacket *z = router->allocForSending(); //Initialize packet struct
+            z->decoded.portnum = meshtastic_PortNum_TEXT_MESSAGE_APP;
+            z->decoded.payload.size = moist_string.size() + 1; //sensor reading
+            memcpy(z->decoded.payload.bytes, bcd, z->decoded.payload.size);
+            LOG_DEBUG("Msg from=0x%0x, id=0x%x, msg=%.*s\n", z->from, z->id, z->decoded.payload.size, z->decoded.payload.bytes);
+            service.sendToMesh(z, RX_SRC_LOCAL, 1);
+            previousMillis_transmission = currentMillis_transmission;
+        }
 }
